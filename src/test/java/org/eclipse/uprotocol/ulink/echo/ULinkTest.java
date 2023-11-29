@@ -34,21 +34,15 @@ import org.eclipse.uprotocol.uri.builder.UResourceBuilder;
 import org.eclipse.uprotocol.rpc.RpcMapper;
 import org.eclipse.uprotocol.rpc.RpcResult;
 import org.eclipse.uprotocol.transport.builder.UAttributesBuilder;
-import org.eclipse.uprotocol.transport.datamodel.UListener;
-import org.eclipse.uprotocol.transport.datamodel.UStatus;
-import org.eclipse.uprotocol.v1.UAttributes;
-import org.eclipse.uprotocol.v1.UEntity;
-import org.eclipse.uprotocol.v1.UPayload;
-import org.eclipse.uprotocol.v1.UPayloadFormat;
-import org.eclipse.uprotocol.v1.UPriority;
-import org.eclipse.uprotocol.v1.UResource;
-import org.eclipse.uprotocol.v1.UUri;
+import org.eclipse.uprotocol.transport.UListener;
+import org.eclipse.uprotocol.v1.*;
+
 import org.junit.Test;
 
 import com.google.protobuf.Any;
 import com.google.protobuf.Int32Value;
 
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Unit test for simple App.
@@ -80,7 +74,7 @@ public class ULinkTest {
             public UStatus onReceive(UUri uri, UPayload payload, UAttributes attributes) {
                 assertEquals(uri, mTopic);
                 assertEquals(mPayload, payload);
-                return UStatus.ok();
+                return UStatus.newBuilder().setCode(UCode.OK).build();
             }
         };
         
@@ -96,7 +90,7 @@ public class ULinkTest {
         final UAttributes attributes = UAttributesBuilder.publish(UPriority.UPRIORITY_CS4).build();
 
         UStatus status = ulink.send(mTopic, mPayload, attributes);
-        assertTrue(status.isSuccess());
+        assertTrue(status.getCode() == UCode.OK);
     }
 
 
@@ -124,17 +118,17 @@ public class ULinkTest {
             }
         });
 
-        final CompletableFuture<RpcResult<Int32Value>> rpcResponse =
+        final CompletionStage<RpcResult<Int32Value>> rpcResponse =
                 RpcMapper.mapResponseToResult(
                 ulink.invokeMethod(source, mPayload, attributes), Int32Value.class);
 
-        assertFalse(rpcResponse.isCompletedExceptionally());
-        final CompletableFuture<Void> test = rpcResponse.thenAccept(RpcResult -> {
+        assertFalse(rpcResponse.toCompletableFuture().isCompletedExceptionally());
+        final CompletionStage<Void> test = rpcResponse.thenAccept(RpcResult -> {
             assertTrue(RpcResult.isSuccess());
 
             assertEquals(Int32Value.of(3), RpcResult.successValue());
         });
 
-        assertFalse(test.isCompletedExceptionally());
+        assertFalse(test.toCompletableFuture().isCompletedExceptionally());
     }
 }

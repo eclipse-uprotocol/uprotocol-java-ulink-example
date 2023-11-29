@@ -25,22 +25,10 @@
 package org.eclipse.uprotocol.ulink.echo;
 
 import org.eclipse.uprotocol.transport.UTransport;
-import org.eclipse.uprotocol.transport.builder.UAttributesBuilder;
-import org.eclipse.uprotocol.transport.datamodel.UListener;
-import org.eclipse.uprotocol.transport.datamodel.UStatus;
+import org.eclipse.uprotocol.transport.UListener;
 import org.eclipse.uprotocol.uri.validator.UriValidator;
-import org.eclipse.uprotocol.v1.UAttributes;
-import org.eclipse.uprotocol.v1.UPayload;
-import org.eclipse.uprotocol.v1.UPriority;
-import org.eclipse.uprotocol.v1.UUID;
-import org.eclipse.uprotocol.v1.UEntity;
-import org.eclipse.uprotocol.v1.UUri;
-import org.eclipse.uprotocol.v1.UMessageType;
+import org.eclipse.uprotocol.v1.*;
 import org.eclipse.uprotocol.validation.ValidationResult;
-
-import com.google.protobuf.Any;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.rpc.Status;
 
 import java.util.Map;
 
@@ -51,8 +39,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.logging.Log;
-import org.checkerframework.checker.nullness.qual.NonNull;
 import org.eclipse.uprotocol.rpc.RpcClient;
 
 /* Simple example code that shows an echo transport */
@@ -73,7 +59,10 @@ public class ULink implements UTransport, RpcClient {
                 case UMESSAGE_TYPE_RESPONSE:
                     final CompletableFuture<UPayload> responseFuture = mRequests.remove(attributes.getReqid());
                     if (responseFuture == null) {
-                        UStatus.failed("Request{id='" + attributes.getReqid().toString() + "'} already completed");
+                        UStatus.newBuilder()
+                            .setCode(UCode.INTERNAL)
+                            .setMessage("Request{id='" + attributes.getReqid().toString() + "'} already completed")
+                            .build();
                     }
         
                     break;
@@ -88,7 +77,7 @@ public class ULink implements UTransport, RpcClient {
                     }
                     break;
             }
-            return UStatus.ok();
+            return UStatus.newBuilder().setCode(UCode.OK).build();
         }
     };
 
@@ -141,7 +130,7 @@ public class ULink implements UTransport, RpcClient {
      */
     @Override
     public UStatus authenticate(UEntity entity) {
-        return UStatus.ok();
+        return UStatus.newBuilder().setCode(UCode.OK).build();
     }
 
 
@@ -157,16 +146,22 @@ public class ULink implements UTransport, RpcClient {
     public UStatus registerListener(UUri uri, UListener listener) {
         ValidationResult result = UriValidator.validate(uri);
         if (result.isFailure()) {
-            return UStatus.failed(result.getMessage());
+            return UStatus.newBuilder()
+                    .setCode(UCode.INVALID_ARGUMENT)
+                    .setMessage(result.getMessage())
+                    .build();
         }
 
         if (mListeners.containsKey(uri)) {
-            return UStatus.failed("Listener already registered for " + uri);
+            return UStatus.newBuilder()
+                    .setCode(UCode.ALREADY_EXISTS)
+                    .setMessage("Listener already registered for " + uri)
+                    .build();
         }
 
         mListeners.put(uri, listener);
 
-        return UStatus.ok();
+        return UStatus.newBuilder().setCode(UCode.OK).build();
     }
 
 
@@ -178,7 +173,10 @@ public class ULink implements UTransport, RpcClient {
     public UStatus send(UUri uri, UPayload payload, UAttributes attributes) {
         ValidationResult result = UriValidator.validate(uri);
         if (result.isFailure()) {
-            return UStatus.failed(result.getMessage());
+            return UStatus.newBuilder()
+                    .setCode(UCode.INVALID_ARGUMENT)
+                    .setMessage(result.getMessage())
+                    .build();
         }
 
         // Trigger the callback to pretend that the event has looped back
@@ -186,7 +184,7 @@ public class ULink implements UTransport, RpcClient {
             mGenericListener.onReceive(uri, payload, attributes);
         });
 
-        return UStatus.ok();
+        return UStatus.newBuilder().setCode(UCode.OK).build();
     }
     
 
@@ -201,15 +199,21 @@ public class ULink implements UTransport, RpcClient {
     public UStatus unregisterListener(UUri uri, UListener listener) {
         ValidationResult result = UriValidator.validate(uri);
         if (result.isFailure()) {
-            return UStatus.failed(result.getMessage());
+            return UStatus.newBuilder()
+                    .setCode(UCode.INVALID_ARGUMENT)
+                    .setMessage(result.getMessage())
+                    .build();
         }
 
         if (!mListeners.containsKey(uri)) {
-            return UStatus.failed("No listener found for " + uri);
+            return UStatus.newBuilder()
+                    .setCode(UCode.INVALID_ARGUMENT)
+                    .setMessage("No listener found for " + uri)
+                    .build();
         }
 
         mListeners.remove(uri, listener);
-        return UStatus.ok();
+        return UStatus.newBuilder().setCode(UCode.OK).build();
     }
     
 }
